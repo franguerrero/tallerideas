@@ -7,11 +7,19 @@ import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 
 // --- INICIALIZACIÓN DE FIREBASE ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const appId = import.meta.env.VITE_FIREBASE_APP_ID || 'default-app-id';
 
 // --- CONFIGURACIÓN DEL TALLER ---
 const PREGUNTAS_GUIA = [
@@ -586,8 +594,8 @@ export default function App() {
                                                 key={`ben-${val}`}
                                                 onClick={() => actualizarMetrica(idea.id, 'beneficio', val)}
                                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${idea.beneficio === val
-                                                        ? (val === 'Alto' ? 'bg-green-100 text-green-700' : val === 'Medio' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
-                                                        : 'text-slate-400 hover:bg-slate-50'
+                                                    ? (val === 'Alto' ? 'bg-green-100 text-green-700' : val === 'Medio' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
+                                                    : 'text-slate-400 hover:bg-slate-50'
                                                     }`}
                                             >
                                                 {val}
@@ -606,8 +614,8 @@ export default function App() {
                                                 key={`esf-${val}`}
                                                 onClick={() => actualizarMetrica(idea.id, 'esfuerzo', val)}
                                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${idea.esfuerzo === val
-                                                        ? (val === 'Alto' ? 'bg-red-100 text-red-700' : val === 'Medio' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700')
-                                                        : 'text-slate-400 hover:bg-slate-50'
+                                                    ? (val === 'Alto' ? 'bg-red-100 text-red-700' : val === 'Medio' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700')
+                                                    : 'text-slate-400 hover:bg-slate-50'
                                                     }`}
                                             >
                                                 {val}
