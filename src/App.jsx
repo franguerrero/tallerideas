@@ -513,7 +513,6 @@ export default function App() {
                 </button>
             </form>
         </div>
-        </div >
     );
 
     const renderFase2 = () => (
