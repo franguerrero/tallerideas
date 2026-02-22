@@ -438,8 +438,9 @@ export default function App() {
     );
 
     const renderFase1 = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full animate-fade-in">
-            <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col h-[40vh] lg:h-full">
+        <div className="flex flex-col lg:flex-row gap-6 h-full animate-fade-in relative min-h-0">
+            {/* Panel Izquierdo: Inspiración */}
+            <div className="w-full lg:w-1/4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col shrink-0 lg:h-full">
                 <div className="flex items-center space-x-3 mb-6 bg-indigo-50 p-4 rounded-2xl">
                     <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
                         <Lightbulb size={24} />
@@ -458,14 +459,15 @@ export default function App() {
                 </div>
             </div>
 
-            <div className="lg:col-span-3 flex flex-col space-y-4 h-[60vh] lg:h-full relative">
-                <div className="flex-1 bg-slate-100 p-6 rounded-3xl border-2 border-dashed border-slate-300 overflow-y-auto relative shadow-inner custom-scrollbar">
+            {/* Panel Derecho: Tablero de Ideas y Formulario */}
+            <div className="flex-1 flex flex-col min-h-0 bg-slate-100 p-4 md:p-6 rounded-3xl border-2 border-dashed border-slate-300 relative shadow-inner overflow-hidden">
+                <div className="flex-1 overflow-y-auto w-full custom-scrollbar pr-2 pb-4">
                     {groupIdeas.length === 0 ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
                             <div className="bg-white p-6 rounded-full shadow-sm mb-4">
                                 <Plus size={40} className="text-slate-300" />
                             </div>
-                            <p className="font-medium text-lg">Añade tareas. Todos verán lo que escribes.</p>
+                            <p className="font-medium text-lg text-center px-4">Añade tareas. Todos verán lo que escribes.</p>
                         </div>
                     ) : (
                         <div className="flex flex-wrap gap-4 items-start content-start">
@@ -493,23 +495,25 @@ export default function App() {
                     )}
                 </div>
 
-                <form onSubmit={agregarIdea} className="bg-white p-3 rounded-2xl shadow-lg border border-slate-100 flex space-x-3 items-center z-10 shrink-0">
-                    <div className="bg-slate-100 p-3 rounded-xl text-slate-400 hidden sm:block">
-                        <Plus size={20} />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Escribe y pulsa Enter..."
-                        className="flex-1 py-3 px-2 bg-transparent focus:outline-none text-slate-700 font-medium placeholder-slate-400 w-full"
-                        value={nuevaIdea}
-                        onChange={(e) => setNuevaIdea(e.target.value)}
-                    />
-                    <button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center shadow-md shadow-teal-200">
-                        Añadir <span className="hidden md:inline ml-2">Tarea</span>
-                    </button>
-                </form>
             </div>
+
+            <form onSubmit={agregarIdea} className="mt-4 bg-white p-2 sm:p-3 rounded-2xl shadow-lg border border-slate-200 flex space-x-2 sm:space-x-3 items-center shrink-0 w-full">
+                <div className="bg-slate-100 p-2 sm:p-3 rounded-xl text-slate-400 hidden sm:block">
+                    <Plus size={20} />
+                </div>
+                <input
+                    type="text"
+                    placeholder="Escribe y pulsa Enter..."
+                    className="flex-1 py-2 sm:py-3 px-2 bg-transparent focus:outline-none text-slate-700 font-medium placeholder-slate-400 w-full text-sm sm:text-base"
+                    value={nuevaIdea}
+                    onChange={(e) => setNuevaIdea(e.target.value)}
+                />
+                <button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold transition-colors flex items-center shadow-md shadow-teal-200 text-sm sm:text-base whitespace-nowrap">
+                    Añadir <span className="hidden md:inline ml-1">Tarea</span>
+                </button>
+            </form>
         </div>
+        </div >
     );
 
     const renderFase2 = () => (
