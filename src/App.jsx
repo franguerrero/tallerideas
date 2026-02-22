@@ -461,6 +461,24 @@ export default function App() {
 
             {/* Panel Derecho: Tablero de Ideas y Formulario */}
             <div className="lg:col-span-3 flex flex-col space-y-4 h-[50vh] min-h-[400px] lg:h-full relative">
+
+                {/* Formulario Superior */}
+                <form onSubmit={agregarIdea} className="bg-white p-2 sm:p-3 rounded-2xl shadow-lg border border-slate-200 flex space-x-2 sm:space-x-3 items-center shrink-0 w-full mb-2">
+                    <div className="bg-slate-100 p-2 sm:p-3 rounded-xl text-slate-400 hidden sm:block">
+                        <Plus size={20} />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Escribe y pulsa Enter..."
+                        className="flex-1 py-2 sm:py-3 px-2 bg-transparent focus:outline-none text-slate-700 font-medium placeholder-slate-400 w-full text-sm sm:text-base"
+                        value={nuevaIdea}
+                        onChange={(e) => setNuevaIdea(e.target.value)}
+                    />
+                    <button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold transition-colors flex items-center shadow-md shadow-teal-200 text-sm sm:text-base whitespace-nowrap">
+                        Añadir <span className="hidden md:inline ml-1">Tarea</span>
+                    </button>
+                </form>
+
                 <div className="flex-1 flex flex-col min-h-0 bg-slate-100 p-4 md:p-6 rounded-3xl border-2 border-dashed border-slate-300 relative shadow-inner overflow-hidden">
                     <div className="flex-1 overflow-y-auto w-full custom-scrollbar pr-2 pb-4">
                         {groupIdeas.length === 0 ? (
@@ -498,22 +516,6 @@ export default function App() {
 
                 </div>
 
-                {/* Formulario Fijo Inferior */}
-                <form onSubmit={agregarIdea} className="mt-4 bg-white p-2 sm:p-3 rounded-2xl shadow-lg border border-slate-200 flex space-x-2 sm:space-x-3 items-center shrink-0 w-full">
-                    <div className="bg-slate-100 p-2 sm:p-3 rounded-xl text-slate-400 hidden sm:block">
-                        <Plus size={20} />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Escribe y pulsa Enter..."
-                        className="flex-1 py-2 sm:py-3 px-2 bg-transparent focus:outline-none text-slate-700 font-medium placeholder-slate-400 w-full text-sm sm:text-base"
-                        value={nuevaIdea}
-                        onChange={(e) => setNuevaIdea(e.target.value)}
-                    />
-                    <button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold transition-colors flex items-center shadow-md shadow-teal-200 text-sm sm:text-base whitespace-nowrap">
-                        Añadir <span className="hidden md:inline ml-1">Tarea</span>
-                    </button>
-                </form>
             </div>
         </div>
     );
