@@ -62,7 +62,6 @@ export default function App() {
 
     // --- ESTADOS LOCALES DE LA UI ---
     const [tempName, setTempName] = useState("");
-    const [tempGroupName, setTempGroupName] = useState("");
     const [nuevaIdea, setNuevaIdea] = useState("");
     const [localTiempo, setLocalTiempo] = useState(0);
     const [supervisorGroupName, setSupervisorGroupName] = useState(""); // Input para el supervisor
@@ -162,25 +161,6 @@ export default function App() {
             nombre: tempName.trim(),
             groupId: null
         });
-    };
-
-    const crearGrupo = async (e) => {
-        e.preventDefault();
-        if (!tempGroupName.trim()) return;
-
-        // Crear nuevo documento de grupo con ID auto-generado
-        const newGroupRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'groups'));
-        await setDoc(newGroupRef, {
-            nombre: tempGroupName.trim(),
-            faseActual: 0,
-            faseStartTime: Date.now()
-        });
-
-        // Unir al usuario al grupo recién creado
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), {
-            groupId: newGroupRef.id
-        });
-        setTempGroupName("");
     };
 
     const crearGrupoSupervisor = async (e) => {
@@ -378,42 +358,26 @@ export default function App() {
                             <div className="bg-indigo-100 p-3 rounded-xl text-indigo-600 font-bold text-xl">{myProfile.nombre.charAt(0).toUpperCase()}</div>
                             <div>
                                 <h2 className="text-xl font-bold text-slate-800">Hola, {myProfile.nombre}</h2>
-                                <p className="text-sm text-slate-500">Únete a un grupo de trabajo o crea uno nuevo.</p>
+                                <p className="text-sm text-slate-500">Únete a un grupo de trabajo.</p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => setViewMode('supervisor')}
-                            className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center"
-                        >
-                            Vista Supervisor <ChevronRight size={16} />
-                        </button>
+                        {myProfile.nombre.toLowerCase() === 'profesor' && (
+                            <button
+                                onClick={() => setViewMode('supervisor')}
+                                className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center"
+                            >
+                                Vista Supervisor <ChevronRight size={16} />
+                            </button>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Crear Grupo */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Plus className="mr-2 text-teal-500" /> Crear Nuevo Grupo</h3>
-                            <form onSubmit={crearGrupo} className="space-y-4">
-                                <input
-                                    type="text"
-                                    placeholder="Nombre del grupo (Ej: Dpto. Finanzas)..."
-                                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none"
-                                    value={tempGroupName}
-                                    onChange={(e) => setTempGroupName(e.target.value)}
-                                    required
-                                />
-                                <button type="submit" className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-colors shadow-md">
-                                    Crear y Unirse <ArrowRight className="ml-2" size={18} />
-                                </button>
-                            </form>
-                        </div>
-
+                    <div className="flex justify-center">
                         {/* Lista de Grupos Existentes */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 w-full max-w-2xl">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Users className="mr-2 text-indigo-500" /> Grupos Activos</h3>
                             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                 {allGroups.length === 0 ? (
-                                    <p className="text-slate-400 text-center py-8">No hay grupos creados todavía.</p>
+                                    <p className="text-slate-400 text-center py-8">El profesor aún no ha creado los grupos.</p>
                                 ) : (
                                     allGroups.map(grupo => {
                                         const miembros = allUsers.filter(u => u.groupId === grupo.id);
