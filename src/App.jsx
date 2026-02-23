@@ -57,11 +57,15 @@ export default function App() {
     const [allGroups, setAllGroups] = useState([]);
     const [allIdeas, setAllIdeas] = useState([]);
 
+    // --- ESTADOS DE VISTAS Y ADMINISTRACIÓN ---
+    const [viewMode, setViewMode] = useState("participant"); // 'participant' | 'supervisor'
+
     // --- ESTADOS LOCALES DE LA UI ---
     const [tempName, setTempName] = useState("");
     const [tempGroupName, setTempGroupName] = useState("");
     const [nuevaIdea, setNuevaIdea] = useState("");
     const [localTiempo, setLocalTiempo] = useState(0);
+    const [supervisorGroupName, setSupervisorGroupName] = useState(""); // Input para el supervisor
 
     // 1. Inicializar Autenticación
     useEffect(() => {
@@ -117,7 +121,17 @@ export default function App() {
     const myProfile = allUsers.find(u => u.id === user?.uid);
     const myGroup = myProfile?.groupId ? allGroups.find(g => g.id === myProfile.groupId) : null;
     const groupIdeas = myGroup ? allIdeas.filter(i => i.groupId === myGroup.id) : [];
-    const ideasSeleccionadas = groupIdeas.filter(i => i.seleccionada);
+
+    // Calcular ideas seleccionadas: Las 3 con más votos
+    const ideasSeleccionadas = [...groupIdeas]
+        .sort((a, b) => {
+            const votosA = a.votos?.length || 0;
+            const votosB = b.votos?.length || 0;
+            if (votosB !== votosA) return votosB - votosA; // Orden descendente por votos
+            return a.timestamp - b.timestamp; // Desempate: el más antiguo primero
+        })
+        .slice(0, 3)
+        .filter(idea => (idea.votos?.length || 0) > 0); // Solo incluir si tienen al menos 1 voto
 
     // 3. Efecto para el Temporizador Sincronizado
     useEffect(() => {
@@ -169,6 +183,21 @@ export default function App() {
         setTempGroupName("");
     };
 
+    const crearGrupoSupervisor = async (e) => {
+        e.preventDefault();
+        if (!supervisorGroupName.trim()) return;
+
+        // Crear nuevo documento de grupo sin unir al supervisor a él
+        const newGroupRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'groups'));
+        await setDoc(newGroupRef, {
+            nombre: supervisorGroupName.trim(),
+            faseActual: 0,
+            faseStartTime: Date.now()
+        });
+
+        setSupervisorGroupName("");
+    };
+
     const unirseGrupo = async (groupId) => {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), {
             groupId: groupId
@@ -202,7 +231,7 @@ export default function App() {
             autor: myProfile.nombre,
             autorId: user.uid,
             texto: nuevaIdea.trim(),
-            seleccionada: false,
+            votos: [],
             beneficio: 'Medio',
             esfuerzo: 'Medio',
             color: randomColor,
@@ -218,10 +247,28 @@ export default function App() {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'ideas', id));
     };
 
-    const toggleSeleccion = async (idea) => {
-        if (!idea.seleccionada && ideasSeleccionadas.length >= 3) return; // Límite de 3
+    const toggleVoto = async (idea) => {
+        const votosActuales = idea.votos || [];
+        const yaVoto = votosActuales.includes(user.uid);
+
+        // Contar cuántos votos ha emitido este usuario en todas las ideas de su grupo
+        const votosEmitidos = groupIdeas.reduce((total, i) => {
+            return total + (i.votos?.includes(user.uid) ? 1 : 0);
+        }, 0);
+
+        let nuevosVotos = [...votosActuales];
+
+        if (yaVoto) {
+            // Quitar el voto
+            nuevosVotos = nuevosVotos.filter(id => id !== user.uid);
+        } else {
+            // Añadir el voto si no ha superado el máximo (3)
+            if (votosEmitidos >= 3) return;
+            nuevosVotos.push(user.uid);
+        }
+
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'ideas', idea.id), {
-            seleccionada: !idea.seleccionada
+            votos: nuevosVotos
         });
     };
 
@@ -257,14 +304,42 @@ export default function App() {
         URL.revokeObjectURL(url);
     };
 
+    const resetearTaller = async () => {
+        if (!window.confirm("⚠️ ADVERTENCIA: Esta acción borrará a todos los usuarios, grupos y tareas irreversíblemente y cerrará la sesión de todos.\n\n¿Estás completamente seguro de continuar?")) {
+            return;
+        }
+
+        try {
+            // Borrar todos los usuarios
+            for (const u of allUsers) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id));
+            }
+            // Borrar todos los grupos
+            for (const g of allGroups) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'groups', g.id));
+            }
+            // Borrar todas las ideas
+            for (const i of allIdeas) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'ideas', i.id));
+            }
+
+            // Forzar a mi usuario a volver a crear perfil
+            setViewMode('participant');
+
+        } catch (error) {
+            console.error("Error al resetear el taller:", error);
+            alert("Hubo un error al resetear el taller.");
+        }
+    };
+
     // --- COMPONENTES UI ---
 
     if (authLoading) {
         return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin text-teal-500"><Bot size={48} /></div></div>;
     }
 
-    // --- PANTALLA DE LOGIN ---
-    if (!myProfile) {
+    // --- PANTALLA DE ALTA DE USUARIO ---
+    if (!myProfile && viewMode === 'participant') {
         return (
             <div className="h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-slate-100">
@@ -293,7 +368,7 @@ export default function App() {
     }
 
     // --- PANTALLA DE LOBBY (Asignación de Grupos) ---
-    if (!myGroup) {
+    if (viewMode === 'participant' && myProfile && !myGroup) {
         return (
             <div className="h-screen bg-slate-50 flex flex-col p-4 md:p-8 overflow-y-auto">
                 <div className="max-w-4xl w-full mx-auto space-y-8">
@@ -306,6 +381,12 @@ export default function App() {
                                 <p className="text-sm text-slate-500">Únete a un grupo de trabajo o crea uno nuevo.</p>
                             </div>
                         </div>
+                        <button
+                            onClick={() => setViewMode('supervisor')}
+                            className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center"
+                        >
+                            Vista Supervisor <ChevronRight size={16} />
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -357,6 +438,122 @@ export default function App() {
                     </div>
 
                 </div>
+            </div>
+        );
+    }
+
+    // --- VISTA DE SUPERVISOR ---
+    if (viewMode === 'supervisor') {
+        return (
+            <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
+                <header className="bg-indigo-900 shadow-lg px-6 py-4 shrink-0 flex items-center justify-between text-white border-b border-indigo-800">
+                    <div className="flex items-center space-x-4">
+                        <button onClick={() => setViewMode('participant')} className="p-2 bg-indigo-800 hover:bg-indigo-700 rounded-lg transition-colors">
+                            <ArrowRight className="rotate-180" size={20} />
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-extrabold tracking-wide flex items-center"><Target className="mr-2 text-teal-400" /> Panel de Supervisor</h1>
+                            <p className="text-indigo-300 text-sm font-medium">Vista global de todos los grupos del taller</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={resetearTaller}
+                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center border border-red-400"
+                    >
+                        <Trash2 size={16} className="mr-2" /> Resetear Taller
+                    </button>
+                </header>
+
+                <main className="flex-1 p-6 md:p-8 overflow-y-auto space-y-8 custom-scrollbar">
+                    {allGroups.length === 0 ? (
+                        <div className="text-center py-20">
+                            <div className="bg-indigo-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Users size={40} className="text-indigo-300" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-700">No hay grupos activos</h2>
+                            <p className="text-slate-500 mt-2">Los equipos aparecerán aquí conforme se vayan creando.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+                            {/* Tarjeta para Crear Nuevo Grupo (Supervisor) */}
+                            <div className="bg-indigo-50/50 rounded-3xl shadow-sm border-2 border-indigo-200 border-dashed overflow-hidden flex flex-col p-6 items-center justify-center min-h-[250px] relative group hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
+                                <form onSubmit={crearGrupoSupervisor} className="w-full max-w-sm space-y-4">
+                                    <div className="text-center mb-6">
+                                        <div className="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-indigo-500 group-hover:scale-110 transition-transform">
+                                            <Plus size={24} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-indigo-900">Preparar Nuevo Grupo</h3>
+                                        <p className="text-sm text-indigo-600">Crealo vacío para que otros se unan.</p>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del equipo (Ej: Finanzas)..."
+                                        className="w-full p-3 border-2 border-indigo-200 rounded-xl focus:border-indigo-500 outline-none placeholder-indigo-300 text-indigo-900"
+                                        value={supervisorGroupName}
+                                        onChange={(e) => setSupervisorGroupName(e.target.value)}
+                                        required
+                                    />
+                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
+                                        Crear Grupo
+                                    </button>
+                                </form>
+                            </div>
+
+                            {allGroups.map(grupo => {
+                                const miembros = allUsers.filter(u => u.groupId === grupo.id);
+                                const ideasGrupo = allIdeas.filter(i => i.groupId === grupo.id);
+                                const ganadoras = [...ideasGrupo]
+                                    .sort((a, b) => (b.votos?.length || 0) - (a.votos?.length || 0))
+                                    .slice(0, 3);
+
+                                const faseObj = FASES[grupo.faseActual] || FASES[0];
+
+                                return (
+                                    <div key={grupo.id} className="bg-white rounded-3xl shadow-md border border-slate-200 overflow-hidden flex flex-col">
+
+                                        <div className="bg-slate-100 p-5 border-b border-slate-200 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-xl font-bold text-slate-800 flex items-center">
+                                                    {grupo.nombre}
+                                                    <span className="ml-3 bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">{miembros.length} Miembros</span>
+                                                </h3>
+                                                <p className="text-sm font-medium text-slate-500 mt-1 flex items-center">
+                                                    <faseObj.icon size={14} className="mr-1 text-teal-600" /> Fase actual: {faseObj.titulo}
+                                                </p>
+                                            </div>
+                                            <div className="text-right text-xs text-slate-400">
+                                                <p>{ideasGrupo.length} tareas totales</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-5 flex-1 bg-slate-50">
+                                            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center">
+                                                <Star size={16} className="mr-2 text-yellow-500" /> Top Tareas Actuales
+                                            </h4>
+
+                                            {ideasGrupo.length === 0 ? (
+                                                <p className="text-slate-400 text-sm italic">El grupo aún no ha generado ideas.</p>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {ganadoras.map((idea, idx) => (
+                                                        <div key={idea.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-start">
+                                                            <p className="text-slate-800 font-medium text-sm pr-4 line-clamp-2">{idea.texto}</p>
+                                                            <span className="bg-teal-50 text-teal-700 px-2 py-1 rounded font-bold text-xs whitespace-nowrap border border-teal-100">
+                                                                {idea.votos?.length || 0} votos
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </main>
             </div>
         );
     }
@@ -520,54 +717,90 @@ export default function App() {
         </div>
     );
 
-    const renderFase2 = () => (
-        <div className="flex flex-col h-full space-y-6 animate-fade-in">
-            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-6 rounded-3xl shadow-lg text-white flex flex-col md:flex-row items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold flex items-center"><Target className="mr-3 text-teal-400" /> Votación en Equipo</h2>
-                    <p className="text-indigo-200 mt-1">Cualquier miembro puede seleccionar las 3 tareas finales para el grupo.</p>
-                </div>
-                <div className="mt-4 md:mt-0 bg-white/10 px-6 py-3 rounded-2xl backdrop-blur-sm border border-white/20 flex items-center space-x-3">
-                    <span className="text-sm font-medium text-indigo-200 uppercase tracking-wider">Seleccionadas</span>
-                    <div className="flex space-x-1">
-                        {[1, 2, 3].map(num => (
-                            <div key={num} className={`w-3 h-3 rounded-full ${num <= ideasSeleccionadas.length ? 'bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.5)]' : 'bg-indigo-950/50'}`}></div>
-                        ))}
-                    </div>
-                    <span className="text-2xl font-bold ml-2">
-                        {ideasSeleccionadas.length}/3
-                    </span>
-                </div>
-            </div>
+    const renderFase2 = () => {
+        // Calcular cuántos votos he emitido
+        const misVotos = groupIdeas.reduce((total, i) => total + (i.votos?.includes(user.uid) ? 1 : 0), 0);
+        const MAX_VOTOS = 3;
 
-            <div className="flex-1 bg-slate-100/50 p-6 rounded-3xl border border-slate-200 overflow-y-auto">
-                <div className="flex flex-wrap gap-6 justify-center">
-                    {groupIdeas.map(idea => (
-                        <div
-                            key={idea.id}
-                            onClick={() => toggleSeleccion(idea)}
-                            className={`
-                cursor-pointer w-full sm:w-72 min-h-[140px] p-5 rounded-2xl transition-all duration-300 relative
-                ${idea.seleccionada
-                                    ? 'bg-white ring-4 ring-teal-500 shadow-xl scale-105 z-10'
-                                    : `${idea.color} opacity-80 hover:opacity-100 hover:shadow-md hover:-translate-y-1`}
-              `}
-                        >
-                            {idea.seleccionada && (
-                                <div className="absolute -top-4 -right-4 bg-teal-500 text-white p-2 rounded-full shadow-lg border-2 border-white">
-                                    <Star size={20} fill="currentColor" />
-                                </div>
-                            )}
-                            <div className="w-full h-full flex flex-col text-center">
-                                <p className={`font-medium flex-1 ${idea.seleccionada ? 'text-slate-800' : ''}`}>{idea.texto}</p>
-                                <p className="text-[10px] mt-2 opacity-60 font-bold border-t border-black/10 pt-2">De: {idea.autor}</p>
+        return (
+            <div className="flex flex-col h-full space-y-6 animate-fade-in">
+                <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-6 rounded-3xl shadow-lg text-white flex flex-col md:flex-row items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-bold flex items-center"><Target className="mr-3 text-teal-400" /> Votación en Equipo</h2>
+                        <p className="text-indigo-200 mt-1">Reparte tus 3 votos entre las tareas que consideres más importantes.</p>
+                    </div>
+                    <div className="mt-4 md:mt-0 bg-white/10 px-6 py-3 rounded-2xl backdrop-blur-sm border border-white/20 flex flex-col items-center">
+                        <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider mb-1">Mis Votos</span>
+                        <div className="flex items-center space-x-2">
+                            <div className="flex space-x-1">
+                                {[1, 2, 3].map(num => (
+                                    <div key={num} className={`w-4 h-4 rounded-full border-2 border-indigo-900 ${num <= misVotos ? 'bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.5)]' : 'bg-indigo-950/50'}`}></div>
+                                ))}
                             </div>
+                            <span className="text-xl font-bold ml-2 text-white">{misVotos}/{MAX_VOTOS}</span>
                         </div>
-                    ))}
+                        {misVotos === MAX_VOTOS && <span className="text-[10px] text-teal-300 font-bold mt-1">¡Votos agotados!</span>}
+                    </div>
+                </div>
+
+                <div className="flex-1 bg-slate-100/50 p-6 rounded-3xl border border-slate-200 overflow-y-auto">
+                    <div className="flex flex-wrap gap-6 justify-center">
+                        {groupIdeas.map(idea => {
+                            const cantidadVotos = idea.votos?.length || 0;
+                            const yoVotePorEsta = idea.votos?.includes(user.uid) || false;
+
+                            // Comprobar si esta idea es una de las 3 ganadoras actuales
+                            const esPuntera = ideasSeleccionadas.some(s => s.id === idea.id) && cantidadVotos > 0;
+
+                            return (
+                                <div
+                                    key={idea.id}
+                                    onClick={() => toggleVoto(idea)}
+                                    className={`
+                                        cursor-pointer w-full sm:w-72 min-h-[140px] p-5 rounded-2xl transition-all duration-300 relative flex flex-col
+                                        ${esPuntera ? 'ring-4 ring-yellow-400 shadow-xl z-20 bg-white scale-105' : 'hover:-translate-y-1 hover:shadow-md bg-white border border-slate-200'}
+                                    `}
+                                    style={!esPuntera ? { backgroundColor: '#ffffff' } : {}}
+                                >
+                                    {/* Indicador visual del Post-it original como borde lateral o pequeña marca */}
+                                    <div className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl ${idea.color.split(' ')[0]}`}></div>
+
+                                    {/* Marca de top ganadora */}
+                                    {esPuntera && (
+                                        <div className="absolute -top-4 -right-4 bg-yellow-400 text-yellow-900 p-2 rounded-full shadow-lg border-2 border-white flex flex-col items-center justify-center w-12 h-12">
+                                            <Star size={16} fill="currentColor" />
+                                            <span className="text-xs font-black">TOP</span>
+                                        </div>
+                                    )}
+
+                                    {/* Badge si el usuario ha votado por ella */}
+                                    {yoVotePorEsta && (
+                                        <div className="absolute top-2 right-2 bg-indigo-500 text-white rounded-full p-1.5 shadow-sm">
+                                            <CheckCircle size={14} />
+                                        </div>
+                                    )}
+
+                                    <div className="w-full h-full flex flex-col text-left pl-3">
+                                        <p className="font-bold flex-1 text-slate-800 text-sm leading-snug">{idea.texto}</p>
+
+                                        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[100px]">De: {idea.autor}</p>
+
+                                            {/* Contador de votos totales */}
+                                            <div className="flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                                                <Star size={14} className={cantidadVotos > 0 ? "text-yellow-500" : "text-slate-300"} fill={cantidadVotos > 0 ? "currentColor" : "none"} />
+                                                <span className="text-sm font-extrabold text-slate-700">{cantidadVotos}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderFase3 = () => (
         <div className="flex flex-col h-full space-y-6 animate-fade-in">
