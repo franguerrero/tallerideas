@@ -3,7 +3,7 @@ import { Bot, Clock, ChevronRight, Plus, Star, Trash2, ArrowRight, CheckCircle, 
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 
 // --- INICIALIZACIÓN DE FIREBASE ---
@@ -190,6 +190,20 @@ export default function App() {
         });
     };
 
+    const cerrarSesion = async () => {
+        if (window.confirm("¿Seguro que quieres cerrar la sesión actual? Dejarás de estar identificado con este nombre.")) {
+            try {
+                if (user && user.uid) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid));
+                }
+                await signOut(auth);
+                window.location.reload();
+            } catch (error) {
+                console.error("Error al cerrar sesión", error);
+            }
+        }
+    };
+
     const avanzarFase = async () => {
         if (myGroup && myGroup.faseActual < FASES.length - 1) {
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'groups', myGroup.id), {
@@ -321,8 +335,8 @@ export default function App() {
     // --- PANTALLA DE ALTA DE USUARIO ---
     if (!myProfile && viewMode === 'participant') {
         return (
-            <div className="h-screen bg-slate-50 flex items-center justify-center p-4">
-                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-slate-100">
+            <div className="h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative">
+                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-slate-100 z-10">
                     <div className="bg-gradient-to-br from-indigo-500 to-teal-400 p-4 rounded-full inline-block mb-6 shadow-md">
                         <Users size={48} className="text-white" />
                     </div>
@@ -343,6 +357,9 @@ export default function App() {
                         </button>
                     </form>
                 </div>
+                <div className="absolute bottom-6 text-slate-400 text-sm font-medium">
+                    &copy; Fran Guerrero 2026
+                </div>
             </div>
         );
     }
@@ -361,14 +378,23 @@ export default function App() {
                                 <p className="text-sm text-slate-500">Únete a un grupo de trabajo.</p>
                             </div>
                         </div>
-                        {myProfile.nombre.toLowerCase() === 'profesor' && (
+                        <div className="flex items-center space-x-3">
+                            {myProfile.nombre.toLowerCase() === 'profesor' && (
+                                <button
+                                    onClick={() => setViewMode('supervisor')}
+                                    className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center"
+                                >
+                                    <span className="hidden sm:inline mr-1">Vista</span> Supervisor <ChevronRight size={16} />
+                                </button>
+                            )}
                             <button
-                                onClick={() => setViewMode('supervisor')}
-                                className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center"
+                                onClick={cerrarSesion}
+                                className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors flex items-center bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg border border-red-100"
+                                title="Cerrar sesión"
                             >
-                                Vista Supervisor <ChevronRight size={16} />
+                                <LogOut size={16} className="sm:mr-2" /> <span className="hidden sm:inline">Cerrar sesión</span>
                             </button>
-                        )}
+                        </div>
                     </div>
 
                     <div className="flex justify-center">
